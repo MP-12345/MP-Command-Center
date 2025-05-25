@@ -12,6 +12,7 @@ import { RiskManagement } from '@/components/admin/RiskManagement';
 import { MarketingManagement } from '@/components/admin/MarketingManagement';
 import { TechnicalSupport } from '@/components/admin/TechnicalSupport';
 import { AuditLogs } from '@/components/admin/AuditLogs';
+import { EnhancedCustomerSupportPanel } from '@/components/admin/EnhancedCustomerSupportPanel';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdminUser {
@@ -66,6 +67,9 @@ const AdminDashboard = () => {
       case 'overview':
         return <DashboardOverview department={adminUser.department} />;
       case 'users':
+        if (adminUser.department === 'customer_support') {
+          return <EnhancedCustomerSupportPanel department={adminUser.department} />;
+        }
         return <UserManagement department={adminUser.department} />;
       case 'transactions':
         return <TransactionMonitoring department={adminUser.department} />;
@@ -95,7 +99,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       <AdminSidebar 
         department={adminUser.department}
         activeSection={activeSection}
@@ -106,7 +110,7 @@ const AdminDashboard = () => {
           adminUser={adminUser}
           onLogout={handleLogout}
         />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100">
           {renderContent()}
         </main>
       </div>
