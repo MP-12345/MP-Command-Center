@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Filter, Download, MoreHorizontal, Eye, Flag, CheckCircle } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Search, Eye, Filter, TrendingUp, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface EnhancedTransactionMonitoringProps {
   department: string;
@@ -17,82 +16,64 @@ interface EnhancedTransactionMonitoringProps {
 
 export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitoringProps> = ({ department }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
-  const { data: transactions, isLoading } = useQuery({
-    queryKey: ['enhanced-transactions', department, searchTerm, filterType, filterStatus],
+  const { data: transactions, isLoading: transactionsLoading, refetch: refetchTransactions } = useQuery({
+    queryKey: ['enhanced-transactions', statusFilter, typeFilter, searchTerm],
     queryFn: async () => {
+      console.log('Fetching transactions from Supabase...');
       let query = supabase
         .from('transactions')
-        .select(`
-          id,
-          user_id,
-          amount,
-          type,
-          status,
-          reference,
-          description,
-          fee,
-          created_at
-        `)
+        .select('amount, fee, status, type, reference, created_at, user_id, description')
         .order('created_at', { ascending: false });
 
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (typeFilter !== 'all') {
+        query = query.eq('type', typeFilter);
+      }
+
       if (searchTerm) {
-        query = query.or(`reference.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-      }
-
-      if (filterType !== 'all') {
-        query = query.eq('type', filterType);
-      }
-
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
+        query = query.or(`reference.ilike.%${searchTerm}%,user_id.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
       }
 
       const { data, error } = await query.limit(100);
+      console.log('Transactions data:', data);
+      console.log('Transactions error:', error);
       
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
-  const { data: profiles } = useQuery({
+  const { data: profiles, isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles-for-transactions'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, mirackle_id, phone_number');
+        .select('id, full_name, mirackle_id, username');
       
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
-  const getProfileData = (userId: string) => {
+  // Real-time updates every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Refreshing transaction data...');
+      refetchTransactions();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [refetchTransactions]);
+
+  const getUserProfile = (userId: string) => {
     return profiles?.find(p => p.id === userId);
   };
-
-  const getDepartmentColumns = () => {
-    const baseColumns = ['Transaction ID', 'User', 'Type', 'Amount', 'Status', 'Date'];
-    
-    const departmentColumns: Record<string, string[]> = {
-      customer_support: [...baseColumns, 'Support Notes', 'Resolution'],
-      compliance: [...baseColumns, 'Risk Score', 'Compliance Check', 'Flagged'],
-      finance: [...baseColumns, 'Fee', 'Revenue Impact', 'Account Type'],
-      risk: [...baseColumns, 'Risk Level', 'ML Score', 'Review Status'],
-      operations: [...baseColumns, 'Processing Time', 'System Load', 'Performance'],
-      marketing: [...baseColumns, 'Campaign Source', 'Conversion', 'Attribution'],
-      technical: [...baseColumns, 'API Response', 'Error Rate', 'Latency'],
-      audit: [...baseColumns, 'Audit Trail', 'Compliance', 'Documentation']
-    };
-
-    return departmentColumns[department] || baseColumns;
-  };
-
-  const formatCurrency = (amount: number) => `₦${Math.abs(amount).toLocaleString()}`;
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -101,94 +82,173 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
       failed: 'destructive',
       cancelled: 'outline'
     };
+    
+    const icons = {
+      completed: CheckCircle,
+      pending: AlertCircle,
+      failed: AlertCircle,
+      cancelled: AlertCircle
+    };
+    
+    const Icon = icons[status as keyof typeof icons] || AlertCircle;
+    
     return (
-      <Badge variant={variants[status] || 'secondary'}>
-        {status.toUpperCase()}
+      <Badge variant={variants[status] || 'secondary'} className="flex items-center gap-1">
+        <Icon className="w-3 h-3" />
+        {status?.toUpperCase()}
       </Badge>
     );
   };
 
   const getTypeBadge = (type: string) => {
     const colors = {
-      transfer_in: 'bg-green-100 text-green-800',
-      transfer_out: 'bg-red-100 text-red-800',
-      deposit: 'bg-blue-100 text-blue-800',
-      withdrawal: 'bg-orange-100 text-orange-800',
-      fee: 'bg-purple-100 text-purple-800'
+      transfer_in: 'bg-green-100 text-green-800 border-green-200',
+      transfer_out: 'bg-red-100 text-red-800 border-red-200',
+      deposit: 'bg-blue-100 text-blue-800 border-blue-200',
+      withdrawal: 'bg-orange-100 text-orange-800 border-orange-200',
+      fee: 'bg-purple-100 text-purple-800 border-purple-200'
     };
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800'
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+        colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200'
       }`}>
-        {type.replace('_', ' ').toUpperCase()}
+        {type?.replace('_', ' ').toUpperCase()}
       </span>
     );
   };
 
-  const getRiskLevel = (amount: number) => {
-    if (amount > 500000) return 'High';
-    if (amount > 100000) return 'Medium';
-    return 'Low';
-  };
+  const formatCurrency = (amount: number) => `₦${Math.abs(amount).toLocaleString()}`;
 
-  const paginatedTransactions = transactions?.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  if (isLoading) {
+  if (transactionsLoading || profilesLoading) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Loading Transactions...</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading Transaction Data...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      <Card className="w-full">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
-            <div>
-              <CardTitle className="text-lg md:text-xl">Transaction Monitoring</CardTitle>
-              <CardDescription className="text-sm">
-                Monitor and analyze platform transactions - {department.replace('_', ' ')} view
-              </CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-              <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </Button>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg p-6 border">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Transaction Monitoring Center</h1>
+            <p className="text-gray-600">Real-time transaction monitoring and analysis for {department.replace('_', ' ')} department</p>
           </div>
+          {transactionsLoading && (
+            <div className="text-sm text-blue-600">
+              Loading transactions...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Transaction Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                <p className="text-3xl font-semibold text-gray-900">{transactions?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Live Count</p>
+              </div>
+              <CreditCard className="h-8 w-8 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-3xl font-semibold text-green-600">
+                  {transactions?.filter(t => t.status === 'completed').length || 0}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Successful</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-3xl font-semibold text-yellow-600">
+                  {transactions?.filter(t => t.status === 'pending').length || 0}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">In Progress</p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-yellow-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Transaction Volume</p>
+                <p className="text-3xl font-semibold text-gray-900">
+                  ₦{(transactions?.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0) || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Total Amount</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transaction Filters</CardTitle>
+          <CardDescription>Search and filter transactions in real-time</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by transaction ID, reference..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <Input
+                  placeholder="Search by reference, user ID, or description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
-            <Select value={filterType} onValueChange={setFilterType}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
@@ -198,131 +258,117 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
                 <SelectItem value="transfer_out">Transfer Out</SelectItem>
                 <SelectItem value="deposit">Deposit</SelectItem>
                 <SelectItem value="withdrawal">Withdrawal</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="fee">Fee</SelectItem>
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="rounded-md border overflow-x-auto">
+      {/* Transactions Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Live Transaction Data</CardTitle>
+          <CardDescription>Real-time transaction monitoring (Updates every 3 seconds)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  {getDepartmentColumns().map((column) => (
-                    <TableHead key={column} className="whitespace-nowrap">{column}</TableHead>
-                  ))}
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold text-gray-700">Customer</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Reference</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Type</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Amount</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Fee</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Description</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Date</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions?.map((transaction) => {
-                  const profileData = getProfileData(transaction.user_id);
-                  return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-mono text-sm">
-                        {transaction.id.slice(0, 8)}...
-                      </TableCell>
-                      <TableCell>
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{profileData?.full_name || 'Unknown'}</div>
-                          <div className="text-sm text-gray-500 truncate">{profileData?.mirackle_id}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(transaction.type)}</TableCell>
-                      <TableCell className="font-semibold">
-                        {formatCurrency(transaction.amount)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
-                      
-                      {department === 'compliance' && (
-                        <>
-                          <TableCell>
-                            <Badge variant={getRiskLevel(Math.abs(transaction.amount)) === 'High' ? 'destructive' : 'default'}>
-                              {getRiskLevel(Math.abs(transaction.amount))}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          </TableCell>
-                          <TableCell>
-                            {Math.abs(transaction.amount) > 500000 ? (
-                              <Flag className="w-4 h-4 text-red-600" />
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                        </>
-                      )}
-
-                      {department === 'finance' && (
-                        <>
-                          <TableCell>{formatCurrency(transaction.fee || 0)}</TableCell>
-                          <TableCell>{formatCurrency((transaction.fee || 0) * 0.8)}</TableCell>
-                          <TableCell>
-                            <Badge variant="default">Standard</Badge>
-                          </TableCell>
-                        </>
-                      )}
-
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Flag className="mr-2 h-4 w-4" />
-                              Flag Transaction
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {transactions && transactions.length > 0 ? (
+                  transactions.map((transaction) => {
+                    const customer = getUserProfile(transaction.user_id);
+                    
+                    return (
+                      <TableRow key={transaction.reference} className="hover:bg-gray-50 transition-colors">
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                              <span className="text-sm font-medium text-gray-600">
+                                {customer?.full_name?.charAt(0) || 'U'}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{customer?.full_name || 'Unknown Customer'}</div>
+                              <div className="text-sm text-gray-500 truncate">{customer?.mirackle_id || transaction.user_id.slice(0, 8) + '...'}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
+                            {transaction.reference}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          {getTypeBadge(transaction.type)}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`font-medium ${Number(transaction.amount) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(Number(transaction.amount))}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-600">
+                            {formatCurrency(Number(transaction.fee || 0))}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(transaction.status)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600 max-w-xs truncate block">
+                            {transaction.description || 'No description'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-gray-600">
+                            {new Date(transaction.created_at).toLocaleDateString()}
+                            <br />
+                            <span className="text-xs text-gray-400">
+                              {new Date(transaction.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline">
+                            <Eye className="w-4 h-4 mr-1" />
+                            Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <div className="text-gray-500">
+                        {transactionsLoading ? 'Loading transactions...' : 'No transactions found'}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 py-4">
-            <div className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, transactions?.length || 0)} of {transactions?.length || 0} transactions
+          {transactions && transactions.length > 0 && (
+            <div className="mt-4 text-sm text-gray-600">
+              Showing {transactions.length} transactions (Live data updates every 3 seconds)
             </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage * itemsPerPage >= (transactions?.length || 0)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -36,8 +36,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
     const departmentItems: Record<string, any[]> = {
       customer_support: [
-        { id: 'users', label: 'Customer Management', icon: Users },
-        { id: 'transactions', label: 'Transaction Support', icon: CreditCard }
+        { id: 'users', label: 'Customer Management', icon: Users }
       ],
       compliance: [
         { id: 'kyc', label: 'KYC Verification', icon: Shield },
@@ -140,7 +139,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {!isCollapsed && (
         <div className="p-4 border-t border-slate-700">
           <div className="text-center text-slate-400 text-xs">
-            <p>© 2024 MiraklePay</p>
+            <p>© MiraklePay</p>
             <p>Admin Panel v2.0</p>
           </div>
         </div>
