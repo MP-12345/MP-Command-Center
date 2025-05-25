@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { EnhancedUserManagement } from './EnhancedUserManagement';
+import { CustomerSupportPanel } from './CustomerSupportPanel';
 
 interface UserManagementProps {
   department: string;
@@ -16,7 +16,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ department }) =>
         </p>
       </div>
       
-      <EnhancedUserManagement department={department} />
+      <CustomerSupportPanel department={department} />
     </div>
   );
 };

@@ -28,8 +28,15 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
       let query = supabase
         .from('transactions')
         .select(`
-          *,
-          profiles!inner(full_name, mirackle_id, is_verified)
+          id,
+          user_id,
+          amount,
+          type,
+          status,
+          reference,
+          description,
+          fee,
+          created_at
         `)
         .order('created_at', { ascending: false });
 
@@ -52,6 +59,22 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
     }
   });
 
+  const { data: profiles } = useQuery({
+    queryKey: ['profiles-for-transactions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, mirackle_id, phone_number');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const getProfileData = (userId: string) => {
+    return profiles?.find(p => p.id === userId);
+  };
+
   const getDepartmentColumns = () => {
     const baseColumns = ['Transaction ID', 'User', 'Type', 'Amount', 'Status', 'Date'];
     
@@ -72,14 +95,14 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
   const formatCurrency = (amount: number) => `₦${Math.abs(amount).toLocaleString()}`;
 
   const getStatusBadge = (status: string) => {
-    const variants = {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       completed: 'default',
       pending: 'secondary',
       failed: 'destructive',
       cancelled: 'outline'
     };
     return (
-      <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
+      <Badge variant={variants[status] || 'secondary'}>
         {status.toUpperCase()}
       </Badge>
     );
@@ -116,7 +139,7 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Loading Transactions...</CardTitle>
         </CardHeader>
@@ -132,41 +155,41 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="space-y-4 p-4 md:p-6">
+      <Card className="w-full">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div>
-              <CardTitle>Transaction Monitoring</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-lg md:text-xl">Transaction Monitoring</CardTitle>
+              <CardDescription className="text-sm">
                 Monitor and analyze platform transactions - {department.replace('_', ' ')} view
               </CardDescription>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Filter className="w-4 h-4 mr-2" />
-                Advanced Filter
+                Filter
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex space-x-4 mb-6">
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by transaction ID, reference, or description..."
+                placeholder="Search by transaction ID, reference..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
@@ -178,7 +201,7 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -190,119 +213,94 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
             </Select>
           </div>
 
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   {getDepartmentColumns().map((column) => (
-                    <TableHead key={column}>{column}</TableHead>
+                    <TableHead key={column} className="whitespace-nowrap">{column}</TableHead>
                   ))}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions?.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="font-mono text-sm">
-                      {transaction.id.slice(0, 8)}...
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-semibold">{transaction.profiles?.full_name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{transaction.profiles?.mirackle_id}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getTypeBadge(transaction.type)}</TableCell>
-                    <TableCell className="font-semibold">
-                      {formatCurrency(transaction.amount)}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                    <TableCell>{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
-                    
-                    {department === 'compliance' && (
-                      <>
-                        <TableCell>
-                          <Badge variant={getRiskLevel(Math.abs(transaction.amount)) === 'High' ? 'destructive' : 'default'}>
-                            {getRiskLevel(Math.abs(transaction.amount))}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        </TableCell>
-                        <TableCell>
-                          {Math.abs(transaction.amount) > 500000 ? (
-                            <Flag className="w-4 h-4 text-red-600" />
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </TableCell>
-                      </>
-                    )}
-
-                    {department === 'finance' && (
-                      <>
-                        <TableCell>{formatCurrency(transaction.fee || 0)}</TableCell>
-                        <TableCell>{formatCurrency((transaction.fee || 0) * 0.8)}</TableCell>
-                        <TableCell>
-                          <Badge variant={transaction.profiles?.is_verified ? 'default' : 'secondary'}>
-                            {transaction.profiles?.is_verified ? 'Verified' : 'Standard'}
-                          </Badge>
-                        </TableCell>
-                      </>
-                    )}
-
-                    {department === 'risk' && (
-                      <>
-                        <TableCell>
-                          <Badge variant={getRiskLevel(Math.abs(transaction.amount)) === 'High' ? 'destructive' : 'default'}>
-                            {getRiskLevel(Math.abs(transaction.amount))}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-sm">0.{Math.floor(Math.random() * 99)}</span>
-                        </TableCell>
-                        <TableCell>
-                          {transaction.status === 'completed' ? (
+                {paginatedTransactions?.map((transaction) => {
+                  const profileData = getProfileData(transaction.user_id);
+                  return (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="font-mono text-sm">
+                        {transaction.id.slice(0, 8)}...
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{profileData?.full_name || 'Unknown'}</div>
+                          <div className="text-sm text-gray-500 truncate">{profileData?.mirackle_id}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getTypeBadge(transaction.type)}</TableCell>
+                      <TableCell className="font-semibold">
+                        {formatCurrency(transaction.amount)}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{new Date(transaction.created_at).toLocaleDateString()}</TableCell>
+                      
+                      {department === 'compliance' && (
+                        <>
+                          <TableCell>
+                            <Badge variant={getRiskLevel(Math.abs(transaction.amount)) === 'High' ? 'destructive' : 'default'}>
+                              {getRiskLevel(Math.abs(transaction.amount))}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <span className="text-yellow-600">Review</span>
-                          )}
-                        </TableCell>
-                      </>
-                    )}
+                          </TableCell>
+                          <TableCell>
+                            {Math.abs(transaction.amount) > 500000 ? (
+                              <Flag className="w-4 h-4 text-red-600" />
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                        </>
+                      )}
 
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Flag className="mr-2 h-4 w-4" />
-                            Flag Transaction
-                          </DropdownMenuItem>
-                          {department === 'risk' && (
-                            <DropdownMenuItem className="text-red-600">
-                              <Flag className="mr-2 h-4 w-4" />
-                              Mark as Suspicious
+                      {department === 'finance' && (
+                        <>
+                          <TableCell>{formatCurrency(transaction.fee || 0)}</TableCell>
+                          <TableCell>{formatCurrency((transaction.fee || 0) * 0.8)}</TableCell>
+                          <TableCell>
+                            <Badge variant="default">Standard</Badge>
+                          </TableCell>
+                        </>
+                      )}
+
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
                             </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            <DropdownMenuItem>
+                              <Flag className="mr-2 h-4 w-4" />
+                              Flag Transaction
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
 
-          <div className="flex items-center justify-between space-x-2 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 py-4">
             <div className="text-sm text-muted-foreground">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, transactions?.length || 0)} of {transactions?.length || 0} transactions
             </div>

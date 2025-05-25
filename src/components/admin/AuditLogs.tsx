@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AuditPanel } from './AuditPanel';
 
 interface AuditLogsProps {
   department: string;
@@ -14,15 +14,7 @@ export const AuditLogs: React.FC<AuditLogsProps> = ({ department }) => {
         <p className="text-gray-600">Review system audit trails and admin activities</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Admin Activities</CardTitle>
-          <CardDescription>Latest administrative actions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Audit log functionality coming soon...</p>
-        </CardContent>
-      </Card>
+      <AuditPanel department={department} />
     </div>
   );
 };

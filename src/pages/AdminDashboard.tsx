@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { AdminLogin } from '@/components/admin/AdminLogin';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
@@ -90,25 +88,25 @@ const AdminDashboard = () => {
 
   if (!adminUser) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <AdminLogin onLogin={handleLogin} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <AdminSidebar 
         department={adminUser.department}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
       />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader 
           adminUser={adminUser}
           onLogout={handleLogout}
         />
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 overflow-auto">
           {renderContent()}
         </main>
       </div>

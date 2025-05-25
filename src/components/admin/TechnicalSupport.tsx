@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TechnicalSupportPanel } from './TechnicalSupportPanel';
 
 interface TechnicalSupportProps {
   department: string;
@@ -14,29 +14,7 @@ export const TechnicalSupport: React.FC<TechnicalSupportProps> = ({ department }
         <p className="text-gray-600">Manage technical issues and Web3 operations</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Web3 Transactions</CardTitle>
-            <CardDescription>Blockchain transaction monitoring</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">342</p>
-            <p className="text-sm text-muted-foreground">This week</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-            <CardDescription>Platform health monitoring</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">Operational</p>
-            <p className="text-sm text-muted-foreground">All systems running</p>
-          </CardContent>
-        </Card>
-      </div>
+      <TechnicalSupportPanel department={department} />
     </div>
   );
 };
