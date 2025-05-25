@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { EnhancedTechnicalSupportPanel } from './EnhancedTechnicalSupportPanel';
+import { TechnicalSupportPanel } from './TechnicalSupportPanel';
 
 interface TechnicalSupportProps {
   department: string;
 }
 
 export const TechnicalSupport: React.FC<TechnicalSupportProps> = ({ department }) => {
-  return <EnhancedTechnicalSupportPanel department={department} />;
+  return <TechnicalSupportPanel department={department} />;
 };

@@ -305,7 +305,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-slate-600 font-mono">
-                          {log.ip_address || 'Unknown'}
+                          {log.ip_address?.toString() || 'Unknown'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
