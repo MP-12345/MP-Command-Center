@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Phone, Mail, MessageSquare, User, CreditCard, Shield, AlertTriangle, CheckCircle, Eye, Edit, Ban, Unlock } from 'lucide-react';
+import { Search, Phone, Mail, MessageSquare, User, CreditCard, AlertTriangle, CheckCircle, Eye, Edit, Ban, Unlock } from 'lucide-react';
 
 interface EnhancedCustomerSupportPanelProps {
   department: string;
@@ -107,6 +107,18 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
     }
   });
 
+  const { data: kycVerifications, isLoading: kycLoading } = useQuery({
+    queryKey: ['customer-kyc'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kyc_verifications')
+        .select('*');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const getTransactionCount = (userId: string) => {
     return transactions?.filter(t => t.user_id === userId).length || 0;
   };
@@ -123,28 +135,31 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
     return bankAccounts?.filter(b => b.user_id === userId).length || 0;
   };
 
+  const getUserKYCStatus = (userId: string) => {
+    const kyc = kycVerifications?.find(k => k.user_id === userId);
+    return kyc?.status || 'pending';
+  };
+
   const handleSuspendUser = async (userId: string) => {
-    // Admin action implementation
     console.log('Suspending user:', userId);
   };
 
   const handleContactUser = async (userId: string) => {
-    // Admin action implementation
     console.log('Contacting user:', userId);
   };
 
-  if (profilesLoading || transactionsLoading || notificationsLoading || bankAccountsLoading || userSettingsLoading) {
+  if (profilesLoading || transactionsLoading || notificationsLoading || bankAccountsLoading || userSettingsLoading || kycLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          <Card className="shadow-xl border-0">
-            <CardHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-t-lg">
-              <CardTitle className="text-xl md:text-2xl font-bold">Loading Customer Support Data...</CardTitle>
+          <Card className="shadow-sm border">
+            <CardHeader className="bg-white">
+              <CardTitle className="text-xl font-semibold text-gray-900">Loading Customer Support Data...</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-12 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg animate-pulse"></div>
+                  <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
                 ))}
               </div>
             </CardContent>
@@ -155,21 +170,21 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl p-6 md:p-8 text-white">
+        <div className="bg-white rounded-lg p-6 md:p-8 shadow-sm border">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">Customer Support Center</h1>
-              <p className="text-green-100">Comprehensive customer management and support tools</p>
+              <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">Customer Support Center</h1>
+              <p className="text-gray-600">Comprehensive customer management and support tools</p>
             </div>
             <div className="flex space-x-3">
-              <Button variant="secondary" className="bg-white text-green-600 hover:bg-green-50">
+              <Button variant="outline" className="border-gray-300">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 New Ticket
               </Button>
-              <Button variant="secondary" className="bg-white text-green-600 hover:bg-green-50">
+              <Button variant="outline" className="border-gray-300">
                 <Phone className="w-4 h-4 mr-2" />
                 Call Center
               </Button>
@@ -179,62 +194,62 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Total Customers</p>
-                  <p className="text-3xl font-bold">{profiles?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Total Customers</p>
+                  <p className="text-3xl font-semibold text-gray-900">{profiles?.length || 0}</p>
                 </div>
-                <User className="h-10 w-10 text-blue-200" />
+                <User className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm font-medium">Total Transactions</p>
-                  <p className="text-3xl font-bold">{transactions?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                  <p className="text-3xl font-semibold text-gray-900">{transactions?.length || 0}</p>
                 </div>
-                <CreditCard className="h-10 w-10 text-green-200" />
+                <CreditCard className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm font-medium">Active Notifications</p>
-                  <p className="text-3xl font-bold">{notifications?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Active Notifications</p>
+                  <p className="text-3xl font-semibold text-gray-900">{notifications?.length || 0}</p>
                 </div>
-                <MessageSquare className="h-10 w-10 text-purple-200" />
+                <MessageSquare className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium">Bank Accounts</p>
-                  <p className="text-3xl font-bold">{bankAccounts?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Bank Accounts</p>
+                  <p className="text-3xl font-semibold text-gray-900">{bankAccounts?.length || 0}</p>
                 </div>
-                <Shield className="h-10 w-10 text-orange-200" />
+                <CheckCircle className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Customer Management */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-lg">
+        <Card className="shadow-sm border bg-white">
+          <CardHeader className="bg-white border-b">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
               <div>
-                <CardTitle className="text-xl md:text-2xl font-bold">Customer Management</CardTitle>
-                <CardDescription className="text-slate-300">Manage customer accounts, support tickets, and inquiries</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900">Customer Management</CardTitle>
+                <CardDescription className="text-gray-600">Manage customer accounts, support tickets, and inquiries</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -246,22 +261,23 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                   placeholder="Search customers by name, phone, or MiraklePay ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 py-3 text-lg border-2 border-slate-200 focus:border-green-500 rounded-xl"
+                  className="pl-10 py-3 text-base border-gray-300 focus:border-gray-500"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl border-2 border-slate-200 overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="font-semibold text-slate-700">Customer</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Contact</TableHead>
-                    <TableHead className="font-semibold text-slate-700">MiraklePay ID</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Transactions</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Notifications</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                    <TableHead className="font-semibold text-slate-700 text-right">Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Customer</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Contact</TableHead>
+                    <TableHead className="font-semibold text-gray-700">MiraklePay ID</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Transactions</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Notifications</TableHead>
+                    <TableHead className="font-semibold text-gray-700">KYC Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -269,17 +285,20 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                     const recentTransaction = getRecentTransaction(profile.id);
                     const transactionCount = getTransactionCount(profile.id);
                     const notificationCount = getUserNotifications(profile.id);
+                    const kycStatus = getUserKYCStatus(profile.id);
                     
                     return (
-                      <TableRow key={profile.id} className="hover:bg-slate-50 transition-colors">
+                      <TableRow key={profile.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-green-500 to-blue-500 flex items-center justify-center text-white font-semibold">
-                              {profile.full_name?.charAt(0) || 'U'}
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                              <span className="text-sm font-medium text-gray-600">
+                                {profile.full_name?.charAt(0) || 'U'}
+                              </span>
                             </div>
                             <div className="min-w-0">
-                              <div className="font-semibold text-slate-800 truncate">{profile.full_name || 'Unknown'}</div>
-                              <div className="text-sm text-slate-500 truncate">{profile.username}</div>
+                              <div className="font-medium text-gray-900 truncate">{profile.full_name || 'Unknown'}</div>
+                              <div className="text-sm text-gray-500 truncate">{profile.username}</div>
                             </div>
                           </div>
                         </TableCell>
@@ -287,49 +306,54 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2">
                               <Phone className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-slate-600">{profile.phone_number || 'N/A'}</span>
+                              <span className="text-sm text-gray-600">{profile.phone_number || 'N/A'}</span>
                             </div>
                             {profile.waitlist_email && (
                               <div className="flex items-center space-x-2">
                                 <Mail className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-slate-600">{profile.waitlist_email}</span>
+                                <span className="text-sm text-gray-600">{profile.waitlist_email}</span>
                               </div>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <code className="text-sm bg-slate-100 px-2 py-1 rounded text-slate-700 font-mono">
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono">
                             {profile.mirackle_id}
                           </code>
                         </TableCell>
                         <TableCell>
                           <div className="text-center">
-                            <div className="font-semibold text-slate-800">{transactionCount}</div>
-                            <div className="text-xs text-slate-500">Total</div>
+                            <div className="font-medium text-gray-900">{transactionCount}</div>
+                            <div className="text-xs text-gray-500">Total</div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="text-center">
-                            <div className="font-semibold text-slate-800">{notificationCount}</div>
-                            <div className="text-xs text-slate-500">Active</div>
+                            <div className="font-medium text-gray-900">{notificationCount}</div>
+                            <div className="text-xs text-gray-500">Active</div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={profile.biometric_enabled ? "default" : "secondary"} className={profile.biometric_enabled ? "bg-green-100 text-green-800" : ""}>
+                          <Badge variant={kycStatus === 'approved' ? "default" : "secondary"}>
+                            {kycStatus.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={profile.biometric_enabled ? "default" : "secondary"}>
                             {profile.biometric_enabled ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex space-x-2 justify-end">
-                            <Button size="sm" variant="outline" onClick={() => handleContactUser(profile.id)} className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100">
+                            <Button size="sm" variant="outline" onClick={() => handleContactUser(profile.id)}>
                               <MessageSquare className="w-4 h-4 mr-1" />
                               Contact
                             </Button>
-                            <Button size="sm" variant="outline" className="bg-green-50 text-green-600 border-green-200 hover:bg-green-100">
+                            <Button size="sm" variant="outline">
                               <Eye className="w-4 h-4 mr-1" />
                               View
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleSuspendUser(profile.id)} className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100">
+                            <Button size="sm" variant="outline" onClick={() => handleSuspendUser(profile.id)}>
                               <Ban className="w-4 h-4 mr-1" />
                               Suspend
                             </Button>

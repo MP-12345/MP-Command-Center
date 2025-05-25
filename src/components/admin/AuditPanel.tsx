@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FileText, Shield, Activity, Clock, Eye, Download, Filter } from 'lucide-react';
+import { Search, FileText, Shield, Activity, Clock, Eye, Download, Filter, AlertTriangle } from 'lucide-react';
 
 interface AuditPanelProps {
   department: string;
@@ -16,7 +16,7 @@ interface AuditPanelProps {
 export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: auditLogs, isLoading: auditLoading } = useQuery({
+  const { data: auditLogs, isLoading: auditLoading, refetch: refetchAudit } = useQuery({
     queryKey: ['audit-logs', searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -34,7 +34,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
     }
   });
 
-  const { data: adminUsers, isLoading: adminLoading } = useQuery({
+  const { data: adminUsers, isLoading: adminLoading, refetch: refetchAdminUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,7 +47,7 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
     }
   });
 
-  const { data: adminSessions, isLoading: sessionsLoading } = useQuery({
+  const { data: adminSessions, isLoading: sessionsLoading, refetch: refetchSessions } = useQuery({
     queryKey: ['admin-sessions'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -61,6 +61,29 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
     }
   });
 
+  const { data: adminPermissions, isLoading: permissionsLoading } = useQuery({
+    queryKey: ['admin-permissions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('admin_permissions')
+        .select('*');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Auto-refresh every 10 seconds for live monitoring
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchAudit();
+      refetchAdminUsers();
+      refetchSessions();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [refetchAudit, refetchAdminUsers, refetchSessions]);
+
   const getAdminName = (adminId: string) => {
     const admin = adminUsers?.find(a => a.id === adminId);
     return admin?.full_name || 'Unknown Admin';
@@ -73,18 +96,35 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
     return 'outline';
   };
 
-  if (auditLoading || adminLoading || sessionsLoading) {
+  const logAdminAction = async (action: string, resourceType: string, resourceId?: string) => {
+    try {
+      const { data, error } = await supabase.rpc('log_admin_action', {
+        p_admin_user_id: 'current_admin_id', // This should be the current admin's ID
+        p_action: action,
+        p_resource_type: resourceType,
+        p_resource_id: resourceId,
+        p_ip_address: '127.0.0.1' // This should be the actual IP
+      });
+      
+      if (error) throw error;
+      refetchAudit();
+    } catch (error) {
+      console.error('Error logging admin action:', error);
+    }
+  };
+
+  if (auditLoading || adminLoading || sessionsLoading || permissionsLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          <Card className="shadow-xl border-0">
-            <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
-              <CardTitle className="text-xl md:text-2xl font-bold">Loading Audit Data...</CardTitle>
+          <Card className="shadow-sm border bg-white">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-900">Loading Audit Data...</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-12 bg-gradient-to-r from-gray-200 to-gray-300 rounded-lg animate-pulse"></div>
+                  <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
                 ))}
               </div>
             </CardContent>
@@ -95,21 +135,21 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 md:p-8 text-white">
+        <div className="bg-white rounded-lg p-6 md:p-8 shadow-sm border">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">Audit & Monitoring Center</h1>
-              <p className="text-blue-100">Real-time admin activity tracking and security monitoring</p>
+              <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">Audit & Monitoring Center</h1>
+              <p className="text-gray-600">Real-time admin activity tracking and security monitoring</p>
             </div>
             <div className="flex space-x-3">
-              <Button variant="secondary" className="bg-white text-blue-600 hover:bg-blue-50">
+              <Button variant="outline" className="border-gray-300">
                 <Download className="w-4 h-4 mr-2" />
                 Export Logs
               </Button>
-              <Button variant="secondary" className="bg-white text-blue-600 hover:bg-blue-50">
+              <Button variant="outline" className="border-gray-300">
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
               </Button>
@@ -119,70 +159,86 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm font-medium">Total Audit Logs</p>
-                  <p className="text-3xl font-bold">{auditLogs?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Total Audit Logs</p>
+                  <p className="text-3xl font-semibold text-gray-900">{auditLogs?.length || 0}</p>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Live Monitoring
+                  </div>
                 </div>
-                <FileText className="h-10 w-10 text-green-200" />
+                <FileText className="h-10 w-10 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Active Admins</p>
-                  <p className="text-3xl font-bold">
+                  <p className="text-sm font-medium text-gray-600">Active Admins</p>
+                  <p className="text-3xl font-semibold text-gray-900">
                     {adminUsers?.filter(a => a.is_active).length || 0}
                   </p>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Real-time
+                  </div>
                 </div>
-                <Shield className="h-10 w-10 text-blue-200" />
+                <Shield className="h-10 w-10 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm font-medium">Active Sessions</p>
-                  <p className="text-3xl font-bold">
+                  <p className="text-sm font-medium text-gray-600">Active Sessions</p>
+                  <p className="text-3xl font-semibold text-gray-900">
                     {adminSessions?.filter(s => new Date(s.expires_at) > new Date()).length || 0}
                   </p>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Live
+                  </div>
                 </div>
-                <Activity className="h-10 w-10 text-purple-200" />
+                <Activity className="h-10 w-10 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+          <Card className="bg-white border shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium">Today's Activities</p>
-                  <p className="text-3xl font-bold">
+                  <p className="text-sm font-medium text-gray-600">Today's Activities</p>
+                  <p className="text-3xl font-semibold text-gray-900">
                     {auditLogs?.filter(log => 
                       new Date(log.created_at).toDateString() === new Date().toDateString()
                     ).length || 0}
                   </p>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Today
+                  </div>
                 </div>
-                <Clock className="h-10 w-10 text-orange-200" />
+                <Clock className="h-10 w-10 text-gray-400" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Admin Users Status */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-lg">
+        <Card className="shadow-sm border bg-white">
+          <CardHeader className="bg-white border-b">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
               <div>
-                <CardTitle className="text-xl md:text-2xl font-bold">Admin Users Overview</CardTitle>
-                <CardDescription className="text-slate-300">Monitor admin user activities and access status</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900">Admin Users Overview</CardTitle>
+                <CardDescription className="text-gray-600">Monitor admin user activities and access status</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -190,45 +246,47 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="font-semibold text-slate-700">Admin</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Department</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Email</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Last Login</TableHead>
-                    <TableHead className="font-semibold text-slate-700 text-right">Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Admin</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Department</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Email</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Last Login</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {adminUsers?.map((admin) => (
-                    <TableRow key={admin.id} className="hover:bg-slate-50 transition-colors">
+                    <TableRow key={admin.id} className="hover:bg-gray-50 transition-colors">
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                            {admin.full_name.charAt(0)}
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-600">
+                              {admin.full_name.charAt(0)}
+                            </span>
                           </div>
-                          <div className="font-semibold text-slate-800">{admin.full_name}</div>
+                          <div className="font-medium text-gray-900">{admin.full_name}</div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
                           {admin.department.replace('_', ' ').toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-slate-600">{admin.email}</TableCell>
+                      <TableCell className="text-gray-600">{admin.email}</TableCell>
                       <TableCell>
-                        <Badge variant={admin.is_active ? "default" : "destructive"} className={admin.is_active ? "bg-green-100 text-green-800" : ""}>
+                        <Badge variant={admin.is_active ? "default" : "destructive"}>
                           {admin.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-slate-600">
+                      <TableCell className="whitespace-nowrap text-gray-600">
                         {admin.last_login ? 
                           new Date(admin.last_login).toLocaleString() : 
                           'Never'
                         }
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100">
+                        <Button size="sm" variant="outline" onClick={() => logAdminAction('VIEW_ADMIN_DETAILS', 'admin_user', admin.id)}>
                           <Eye className="w-4 h-4 mr-1" />
                           View Details
                         </Button>
@@ -242,12 +300,12 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
         </Card>
 
         {/* Audit Trail */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-t-lg">
+        <Card className="shadow-sm border bg-white">
+          <CardHeader className="bg-white border-b">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
               <div>
-                <CardTitle className="text-xl md:text-2xl font-bold">Live Audit Trail</CardTitle>
-                <CardDescription className="text-slate-300">Real-time monitoring of all administrative actions</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900">Live Audit Trail</CardTitle>
+                <CardDescription className="text-gray-600">Real-time monitoring of all administrative actions</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -259,32 +317,32 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
                   placeholder="Search audit logs by action, resource, or admin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 py-3 text-lg border-2 border-slate-200 focus:border-blue-500 rounded-xl"
+                  className="pl-10 py-3 text-base border-gray-300 focus:border-gray-500"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl border-2 border-slate-200 overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="font-semibold text-slate-700">Timestamp</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Admin</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Action</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Resource</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Resource ID</TableHead>
-                    <TableHead className="font-semibold text-slate-700">IP Address</TableHead>
-                    <TableHead className="font-semibold text-slate-700 text-right">Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">Timestamp</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Admin</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Action</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Resource</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Resource ID</TableHead>
+                    <TableHead className="font-semibold text-gray-700">IP Address</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {auditLogs?.map((log) => (
-                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <TableCell className="whitespace-nowrap font-mono text-sm text-slate-600">
+                    <TableRow key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <TableCell className="whitespace-nowrap font-mono text-sm text-gray-600">
                         {new Date(log.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-slate-800">
+                        <div className="font-medium text-gray-900">
                           {getAdminName(log.admin_user_id)}
                         </div>
                       </TableCell>
@@ -294,22 +352,22 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ department }) => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm bg-slate-100 px-2 py-1 rounded text-slate-700">
+                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded text-gray-700">
                           {log.resource_type}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600">
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">
                           {log.resource_id?.slice(0, 8) || 'N/A'}...
                         </code>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-slate-600 font-mono">
+                        <span className="text-sm text-gray-600 font-mono">
                           {log.ip_address?.toString() || 'Unknown'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100">
+                        <Button size="sm" variant="outline" onClick={() => logAdminAction('VIEW_AUDIT_DETAILS', 'audit_log', log.id)}>
                           <Eye className="w-4 h-4 mr-1" />
                           View Details
                         </Button>
