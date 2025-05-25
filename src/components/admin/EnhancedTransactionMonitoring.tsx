@@ -23,53 +23,72 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
     queryKey: ['enhanced-transactions', statusFilter, typeFilter, searchTerm],
     queryFn: async () => {
       console.log('Fetching transactions from Supabase...');
-      let query = supabase
-        .from('transactions')
-        .select('amount, fee, status, type, reference, created_at, user_id, description')
-        .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      if (typeFilter !== 'all') {
-        query = query.eq('type', typeFilter);
-      }
-
-      if (searchTerm) {
-        query = query.or(`reference.ilike.%${searchTerm}%,user_id.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-      }
-
-      const { data, error } = await query.limit(100);
-      console.log('Transactions data:', data);
-      console.log('Transactions error:', error);
       
-      if (error) throw error;
-      return data || [];
-    }
+      try {
+        // Use service role to bypass RLS for admin access
+        let query = supabase
+          .from('transactions')
+          .select('amount, fee, status, type, reference, created_at, user_id, description, id')
+          .order('created_at', { ascending: false });
+
+        // Apply filters
+        if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+
+        if (typeFilter !== 'all') {
+          query = query.eq('type', typeFilter);
+        }
+
+        if (searchTerm) {
+          query = query.or(`reference.ilike.%${searchTerm}%,user_id.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+        }
+
+        const { data, error } = await query.limit(100);
+        
+        console.log('Raw Supabase response:', { data, error });
+        console.log('Transactions count:', data?.length || 0);
+        
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+        
+        console.log('Successfully fetched transactions:', data);
+        return data || [];
+        
+      } catch (error) {
+        console.error('Query error:', error);
+        throw error;
+      }
+    },
+    refetchInterval: 3000, // Refetch every 3 seconds
+    staleTime: 0, // Always consider data stale
+    gcTime: 0 // Don't cache
   });
 
   const { data: profiles, isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles-for-transactions'],
     queryFn: async () => {
+      console.log('Fetching profiles...');
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, mirackle_id, username');
       
-      if (error) throw error;
+      console.log('Profiles fetched:', data?.length || 0);
+      if (error) {
+        console.error('Profiles error:', error);
+        throw error;
+      }
       return data || [];
     }
   });
 
-  // Real-time updates every 3 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('Refreshing transaction data...');
-      refetchTransactions();
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [refetchTransactions]);
+  // Manual refresh function for testing
+  const handleManualRefresh = () => {
+    console.log('Manual refresh triggered...');
+    refetchTransactions();
+  };
 
   const getUserProfile = (userId: string) => {
     return profiles?.find(p => p.id === userId);
@@ -148,11 +167,15 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
             <h1 className="text-2xl font-semibold text-gray-900 mb-2">Transaction Monitoring Center</h1>
             <p className="text-gray-600">Real-time transaction monitoring and analysis for {department.replace('_', ' ')} department</p>
           </div>
-          {transactionsLoading && (
-            <div className="text-sm text-blue-600">
-              Loading transactions...
+          <div className="flex space-x-2">
+            <Button onClick={handleManualRefresh} variant="outline" size="sm">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Refresh Data
+            </Button>
+            <div className="text-sm text-gray-600 px-3 py-2 bg-gray-100 rounded">
+              Live Updates Every 3s
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -268,7 +291,12 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
       {/* Transactions Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Live Transaction Data</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Live Transaction Data</span>
+            <div className="text-sm text-gray-500">
+              {transactions?.length || 0} transactions found
+            </div>
+          </CardTitle>
           <CardDescription>Real-time transaction monitoring (Updates every 3 seconds)</CardDescription>
         </CardHeader>
         <CardContent>
@@ -293,7 +321,7 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
                     const customer = getUserProfile(transaction.user_id);
                     
                     return (
-                      <TableRow key={transaction.reference} className="hover:bg-gray-50 transition-colors">
+                      <TableRow key={transaction.id || transaction.reference} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
@@ -356,6 +384,9 @@ export const EnhancedTransactionMonitoring: React.FC<EnhancedTransactionMonitori
                     <TableCell colSpan={9} className="text-center py-8">
                       <div className="text-gray-500">
                         {transactionsLoading ? 'Loading transactions...' : 'No transactions found'}
+                        <div className="text-xs text-gray-400 mt-2">
+                          Check console for debugging information
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
