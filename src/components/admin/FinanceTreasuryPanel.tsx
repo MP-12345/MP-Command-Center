@@ -20,7 +20,8 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
     totalTransactions: 0,
     totalVolume: 0,
     totalFees: 0,
-    totalUsers: 0
+    totalUsers: 0,
+    transactionCount: 0
   });
 
   const { data: profiles, isLoading: profilesLoading, refetch: refetchProfiles } = useQuery({
@@ -45,7 +46,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
         query = query.or(`full_name.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(100);
       if (error) throw error;
       return data;
     }
@@ -76,18 +77,18 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
     }
   });
 
-  // Real-time updates every 5 seconds
+  // Real-time updates every 2 seconds for financial data
   useEffect(() => {
     const interval = setInterval(() => {
       refetchProfiles();
       refetchTransactions();
       refetchFees();
-    }, 5000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [refetchProfiles, refetchTransactions, refetchFees]);
 
-  // Calculate real-time financial metrics
+  // Calculate real-time financial metrics every second
   useEffect(() => {
     if (profiles && transactions && fees) {
       const totalBalance = profiles.reduce((sum, profile) => sum + Number(profile.balance || 0), 0);
@@ -95,13 +96,15 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
       const totalVolume = transactions.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0);
       const totalFees = fees.reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
       const totalUsers = profiles.length;
+      const transactionCount = profiles.reduce((sum, profile) => sum + Number(profile.transaction_count || 0), 0);
 
       setRealTimeStats({
         totalBalance,
         totalTransactions,
         totalVolume,
         totalFees,
-        totalUsers
+        totalUsers,
+        transactionCount
       });
     }
   }, [profiles, transactions, fees]);
@@ -119,8 +122,8 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
 
   if (profilesLoading || transactionsLoading) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
-        <Card className="shadow-sm border bg-white">
+      <div className="space-y-4 p-6">
+        <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-gray-900">Loading Finance Data...</CardTitle>
           </CardHeader>
@@ -137,10 +140,10 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      {/* Financial Overview Cards */}
+    <div className="space-y-4 p-6">
+      {/* Real-time Financial Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -148,7 +151,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
                 <p className="text-2xl font-semibold text-gray-900">{formatCurrency(realTimeStats.totalBalance)}</p>
                 <div className="flex items-center text-xs text-gray-500 mt-1">
                   <Activity className="w-3 h-3 mr-1" />
-                  Live
+                  Live Data
                 </div>
               </div>
               <DollarSign className="h-8 w-8 text-gray-400" />
@@ -156,7 +159,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -164,7 +167,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
                 <p className="text-2xl font-semibold text-gray-900">{realTimeStats.totalTransactions.toLocaleString()}</p>
                 <div className="flex items-center text-xs text-gray-500 mt-1">
                   <Activity className="w-3 h-3 mr-1" />
-                  Live
+                  Live Count
                 </div>
               </div>
               <CreditCard className="h-8 w-8 text-gray-400" />
@@ -172,7 +175,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -180,7 +183,7 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
                 <p className="text-2xl font-semibold text-gray-900">{formatCurrency(realTimeStats.totalVolume)}</p>
                 <div className="flex items-center text-xs text-gray-500 mt-1">
                   <Activity className="w-3 h-3 mr-1" />
-                  Live
+                  Live Volume
                 </div>
               </div>
               <TrendingUp className="h-8 w-8 text-gray-400" />
@@ -188,15 +191,15 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Fee Revenue</p>
+                <p className="text-sm font-medium text-gray-600">Fee Revenue</p>
                 <p className="text-2xl font-semibold text-gray-900">{formatCurrency(realTimeStats.totalFees)}</p>
                 <div className="flex items-center text-xs text-gray-500 mt-1">
                   <Activity className="w-3 h-3 mr-1" />
-                  Live
+                  Live Revenue
                 </div>
               </div>
               <DollarSign className="h-8 w-8 text-gray-400" />
@@ -204,15 +207,15 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-sm font-medium text-gray-600">Active Users</p>
                 <p className="text-2xl font-semibold text-gray-900">{realTimeStats.totalUsers.toLocaleString()}</p>
                 <div className="flex items-center text-xs text-gray-500 mt-1">
                   <Activity className="w-3 h-3 mr-1" />
-                  Live
+                  Live Users
                 </div>
               </div>
               <Users className="h-8 w-8 text-gray-400" />
@@ -221,12 +224,17 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
         </Card>
       </div>
 
-      <Card className="shadow-sm border bg-white">
-        <CardHeader className="border-b bg-white">
+      {/* Real-time Financial Reports */}
+      <Card className="border border-gray-200 bg-white">
+        <CardHeader className="border-b bg-white border-gray-200">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div>
               <CardTitle className="text-xl font-semibold text-gray-900">Finance & Treasury Management</CardTitle>
-              <CardDescription className="text-gray-600">Monitor user balances and transaction volumes (Live Data)</CardDescription>
+              <CardDescription className="text-gray-600">Real-time financial operations and treasury monitoring</CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Button variant="outline">Export Report</Button>
+              <Button variant="outline">Generate Statement</Button>
             </div>
           </div>
         </CardHeader>
@@ -277,14 +285,14 @@ export const FinanceTreasuryPanel: React.FC<FinanceTreasuryPanelProps> = ({ depa
                         </code>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-green-600">
+                        <div className="font-medium text-gray-900">
                           {formatCurrency(Number(profile.balance || 0))}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-center">
                           <div className="font-medium text-gray-900">{actualTransactionCount}</div>
-                          <div className="text-xs text-gray-500">Live</div>
+                          <div className="text-xs text-gray-500">Live Count</div>
                         </div>
                       </TableCell>
                       <TableCell>

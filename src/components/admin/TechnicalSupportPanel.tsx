@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ interface TechnicalSupportPanelProps {
 export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ department }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: profiles, isLoading: profilesLoading } = useQuery({
+  const { data: profiles, isLoading: profilesLoading, refetch: refetchProfiles } = useQuery({
     queryKey: ['technical-profiles', searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -42,27 +42,27 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
         query = query.or(`full_name.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(100);
       if (error) throw error;
       return data;
     }
   });
 
-  const { data: web3Transactions, isLoading: web3Loading } = useQuery({
+  const { data: web3Transactions, isLoading: web3Loading, refetch: refetchWeb3 } = useQuery({
     queryKey: ['web3-transactions'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('web3_transactions')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (error) throw error;
       return data;
     }
   });
 
-  const { data: webauthnCredentials, isLoading: webauthnLoading } = useQuery({
+  const { data: webauthnCredentials, isLoading: webauthnLoading, refetch: refetchWebauthn } = useQuery({
     queryKey: ['webauthn-credentials'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -75,19 +75,7 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
     }
   });
 
-  const { data: userSettings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['user-settings'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('*');
-
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: customTokens, isLoading: tokensLoading } = useQuery({
+  const { data: customTokens, isLoading: tokensLoading, refetch: refetchTokens } = useQuery({
     queryKey: ['custom-tokens'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -98,6 +86,18 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
       return data;
     }
   });
+
+  // Real-time updates every 5 seconds for technical monitoring
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchProfiles();
+      refetchWeb3();
+      refetchWebauthn();
+      refetchTokens();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [refetchProfiles, refetchWeb3, refetchWebauthn, refetchTokens]);
 
   const getWeb3TransactionCount = (userId: string) => {
     return web3Transactions?.filter(tx => tx.user_id === userId).length || 0;
@@ -123,10 +123,10 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
     return 'Needs Attention';
   };
 
-  if (profilesLoading || web3Loading || webauthnLoading || settingsLoading || tokensLoading) {
+  if (profilesLoading || web3Loading || webauthnLoading || tokensLoading) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
-        <Card className="shadow-sm border bg-white">
+      <div className="space-y-4 p-6">
+        <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-gray-900">Loading Technical Support Data...</CardTitle>
           </CardHeader>
@@ -143,10 +143,10 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      {/* Technical Overview Cards */}
+    <div className="space-y-4 p-6">
+      {/* Live Technical Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -154,13 +154,14 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
                 <p className="text-2xl font-semibold text-gray-900">
                   {profiles?.filter(p => p.web3_wallet_initialized).length || 0}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Live Count</p>
               </div>
               <Wifi className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -168,42 +169,46 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
                 <p className="text-2xl font-semibold text-gray-900">
                   {profiles?.filter(p => p.biometric_enabled).length || 0}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Active</p>
               </div>
               <Smartphone className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Web3 Transactions</p>
                 <p className="text-2xl font-semibold text-gray-900">{web3Transactions?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Total</p>
               </div>
               <Activity className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Security Keys</p>
                 <p className="text-2xl font-semibold text-gray-900">{webauthnCredentials?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Registered</p>
               </div>
               <Key className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Custom Tokens</p>
                 <p className="text-2xl font-semibold text-gray-900">{customTokens?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Added</p>
               </div>
               <Settings className="h-8 w-8 text-gray-400" />
             </div>
@@ -211,12 +216,12 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
         </Card>
       </div>
 
-      <Card className="shadow-sm border bg-white">
-        <CardHeader className="border-b bg-white">
+      <Card className="border border-gray-200 bg-white">
+        <CardHeader className="border-b bg-white border-gray-200">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900">Technical Support Panel</CardTitle>
-              <CardDescription className="text-gray-600">Monitor user technical configurations and Web3 operations</CardDescription>
+              <CardTitle className="text-xl font-semibold text-gray-900">Technical Support Dashboard</CardTitle>
+              <CardDescription className="text-gray-600">Live technical monitoring and Web3 operations analytics</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -245,7 +250,7 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
                   <TableHead className="font-semibold text-gray-700">Web3 TXs</TableHead>
                   <TableHead className="font-semibold text-gray-700">Security Keys</TableHead>
                   <TableHead className="font-semibold text-gray-700">Custom Tokens</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Technical Status</TableHead>
                   <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -272,7 +277,7 @@ export const TechnicalSupportPanel: React.FC<TechnicalSupportPanelProps> = ({ de
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Badge variant={profile.web3_wallet_initialized ? "default" : "outline"}>
-                            {profile.web3_wallet_initialized ? 'Initialized' : 'Not Setup'}
+                            {profile.web3_wallet_initialized ? 'Active' : 'Inactive'}
                           </Badge>
                           {profile.web3_wallet_address && (
                             <span className="text-xs text-gray-500">

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Phone, Mail, MessageSquare, User, CreditCard, AlertTriangle, CheckCircle, Eye, Edit, Ban, Unlock } from 'lucide-react';
+import { Search, Phone, Mail, MessageSquare, User, CreditCard, Eye, Ban } from 'lucide-react';
 
 interface EnhancedCustomerSupportPanelProps {
   department: string;
@@ -16,7 +16,7 @@ interface EnhancedCustomerSupportPanelProps {
 export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanelProps> = ({ department }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: profiles, isLoading: profilesLoading } = useQuery({
+  const { data: profiles, isLoading: profilesLoading, refetch: refetchProfiles } = useQuery({
     queryKey: ['customer-support-profiles', searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -48,76 +48,35 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
         query = query.or(`full_name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(100);
       if (error) throw error;
       return data;
     }
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery({
+  const { data: transactions, isLoading: transactionsLoading, refetch: refetchTransactions } = useQuery({
     queryKey: ['customer-support-transactions'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
         .select('amount, fee, status, type, reference, created_at, user_id, description')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (error) throw error;
       return data;
     }
   });
 
-  const { data: notifications, isLoading: notificationsLoading } = useQuery({
-    queryKey: ['customer-notifications'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+  // Real-time updates every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchProfiles();
+      refetchTransactions();
+    }, 3000);
 
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: bankAccounts, isLoading: bankAccountsLoading } = useQuery({
-    queryKey: ['customer-bank-accounts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: userSettings, isLoading: userSettingsLoading } = useQuery({
-    queryKey: ['customer-user-settings'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('*');
-
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: kycVerifications, isLoading: kycLoading } = useQuery({
-    queryKey: ['customer-kyc'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('kyc_verifications')
-        .select('*');
-
-      if (error) throw error;
-      return data;
-    }
-  });
+    return () => clearInterval(interval);
+  }, [refetchProfiles, refetchTransactions]);
 
   const getTransactionCount = (userId: string) => {
     return transactions?.filter(t => t.user_id === userId).length || 0;
@@ -127,33 +86,27 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
     return transactions?.find(t => t.user_id === userId);
   };
 
-  const getUserNotifications = (userId: string) => {
-    return notifications?.filter(n => n.user_id === userId).length || 0;
-  };
-
-  const getUserBankAccounts = (userId: string) => {
-    return bankAccounts?.filter(b => b.user_id === userId).length || 0;
-  };
-
-  const getUserKYCStatus = (userId: string) => {
-    const kyc = kycVerifications?.find(k => k.user_id === userId);
-    return kyc?.status || 'pending';
+  const getTotalTransactionAmount = (userId: string) => {
+    return transactions?.filter(t => t.user_id === userId)
+      .reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0) || 0;
   };
 
   const handleSuspendUser = async (userId: string) => {
     console.log('Suspending user:', userId);
+    // Implementation for suspending user
   };
 
   const handleContactUser = async (userId: string) => {
     console.log('Contacting user:', userId);
+    // Implementation for contacting user
   };
 
-  if (profilesLoading || transactionsLoading || notificationsLoading || bankAccountsLoading || userSettingsLoading || kycLoading) {
+  if (profilesLoading || transactionsLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
-          <Card className="shadow-sm border">
-            <CardHeader className="bg-white">
+          <Card className="border-gray-200">
+            <CardHeader className="bg-white border-b border-gray-200">
               <CardTitle className="text-xl font-semibold text-gray-900">Loading Customer Support Data...</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -170,10 +123,10 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg p-6 md:p-8 shadow-sm border">
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div>
               <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">Customer Support Center</h1>
@@ -192,64 +145,72 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Card className="bg-white border shadow-sm">
+        {/* Live Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Customers</p>
                   <p className="text-3xl font-semibold text-gray-900">{profiles?.length || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">Live Count</p>
                 </div>
                 <User className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border shadow-sm">
+          <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Transactions</p>
                   <p className="text-3xl font-semibold text-gray-900">{transactions?.length || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">Live Count</p>
                 </div>
                 <CreditCard className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border shadow-sm">
+          <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Active Notifications</p>
-                  <p className="text-3xl font-semibold text-gray-900">{notifications?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Active Users</p>
+                  <p className="text-3xl font-semibold text-gray-900">
+                    {profiles?.filter(p => p.biometric_enabled).length || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Biometric Enabled</p>
                 </div>
                 <MessageSquare className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border shadow-sm">
+          <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Bank Accounts</p>
-                  <p className="text-3xl font-semibold text-gray-900">{bankAccounts?.length || 0}</p>
+                  <p className="text-sm font-medium text-gray-600">Transaction Volume</p>
+                  <p className="text-3xl font-semibold text-gray-900">
+                    ₦{(transactions?.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0) || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Total Amount</p>
                 </div>
-                <CheckCircle className="h-8 w-8 text-gray-400" />
+                <CreditCard className="h-8 w-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Customer Management */}
-        <Card className="shadow-sm border bg-white">
-          <CardHeader className="bg-white border-b">
+        <Card className="border border-gray-200 bg-white">
+          <CardHeader className="bg-white border-b border-gray-200">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
               <div>
                 <CardTitle className="text-xl font-semibold text-gray-900">Customer Management</CardTitle>
-                <CardDescription className="text-gray-600">Manage customer accounts, support tickets, and inquiries</CardDescription>
+                <CardDescription className="text-gray-600">Live customer accounts and transaction history</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -274,8 +235,8 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                     <TableHead className="font-semibold text-gray-700">Contact</TableHead>
                     <TableHead className="font-semibold text-gray-700">MiraklePay ID</TableHead>
                     <TableHead className="font-semibold text-gray-700">Transactions</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Notifications</TableHead>
-                    <TableHead className="font-semibold text-gray-700">KYC Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Transaction Volume</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Last Transaction</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
                     <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                   </TableRow>
@@ -284,8 +245,7 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                   {profiles?.map((profile) => {
                     const recentTransaction = getRecentTransaction(profile.id);
                     const transactionCount = getTransactionCount(profile.id);
-                    const notificationCount = getUserNotifications(profile.id);
-                    const kycStatus = getUserKYCStatus(profile.id);
+                    const totalVolume = getTotalTransactionAmount(profile.id);
                     
                     return (
                       <TableRow key={profile.id} className="hover:bg-gray-50 transition-colors">
@@ -328,15 +288,26 @@ export const EnhancedCustomerSupportPanel: React.FC<EnhancedCustomerSupportPanel
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-center">
-                            <div className="font-medium text-gray-900">{notificationCount}</div>
-                            <div className="text-xs text-gray-500">Active</div>
+                          <div className="font-medium text-gray-900">
+                            ₦{totalVolume.toLocaleString()}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={kycStatus === 'approved' ? "default" : "secondary"}>
-                            {kycStatus.toUpperCase()}
-                          </Badge>
+                          {recentTransaction ? (
+                            <div>
+                              <div className="text-sm font-medium">
+                                ₦{Math.abs(Number(recentTransaction.amount)).toLocaleString()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(recentTransaction.created_at).toLocaleDateString()}
+                              </div>
+                              <Badge variant={recentTransaction.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                                {recentTransaction.status}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">No transactions</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={profile.biometric_enabled ? "default" : "secondary"}>

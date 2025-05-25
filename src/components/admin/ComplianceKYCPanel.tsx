@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Shield, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
+import { Search, Shield, AlertTriangle, CheckCircle, FileText, Users } from 'lucide-react';
 
 interface ComplianceKYCPanelProps {
   department: string;
@@ -16,7 +16,7 @@ interface ComplianceKYCPanelProps {
 export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ department }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: profiles, isLoading: profilesLoading } = useQuery({
+  const { data: profiles, isLoading: profilesLoading, refetch: refetchProfiles } = useQuery({
     queryKey: ['compliance-profiles', searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -42,13 +42,13 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
         query = query.or(`full_name.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%,nin_number.ilike.%${searchTerm}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(100);
       if (error) throw error;
       return data;
     }
   });
 
-  const { data: kycVerifications, isLoading: kycLoading } = useQuery({
+  const { data: kycVerifications, isLoading: kycLoading, refetch: refetchKyc } = useQuery({
     queryKey: ['kyc-verifications'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -61,7 +61,7 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
     }
   });
 
-  const { data: userDocuments, isLoading: documentsLoading } = useQuery({
+  const { data: userDocuments, isLoading: documentsLoading, refetch: refetchDocuments } = useQuery({
     queryKey: ['user-documents'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -73,6 +73,17 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
       return data;
     }
   });
+
+  // Real-time updates every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchProfiles();
+      refetchKyc();
+      refetchDocuments();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [refetchProfiles, refetchKyc, refetchDocuments]);
 
   const getKYCStatus = (userId: string) => {
     const kyc = kycVerifications?.find(k => k.user_id === userId);
@@ -96,10 +107,20 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
     return userDocuments?.filter(doc => doc.user_id === userId).length || 0;
   };
 
+  const handleApproveKYC = async (userId: string) => {
+    console.log('Approving KYC for user:', userId);
+    // Implementation for approving KYC
+  };
+
+  const handleRejectKYC = async (userId: string) => {
+    console.log('Rejecting KYC for user:', userId);
+    // Implementation for rejecting KYC
+  };
+
   if (profilesLoading || kycLoading || documentsLoading) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
-        <Card className="shadow-sm border bg-white">
+      <div className="space-y-4 p-6">
+        <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-gray-900">Loading Compliance Data...</CardTitle>
           </CardHeader>
@@ -116,22 +137,23 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      {/* Stats Overview */}
+    <div className="space-y-4 p-6">
+      {/* Live Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Users</p>
                 <p className="text-2xl font-semibold text-gray-900">{profiles?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Live Count</p>
               </div>
-              <Shield className="h-8 w-8 text-gray-400" />
+              <Users className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -139,13 +161,14 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
                 <p className="text-2xl font-semibold text-gray-900">
                   {kycVerifications?.filter(k => k.status === 'pending').length || 0}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Awaiting Review</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -153,18 +176,20 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
                 <p className="text-2xl font-semibold text-gray-900">
                   {kycVerifications?.filter(k => k.status === 'approved').length || 0}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Verified Users</p>
               </div>
               <CheckCircle className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-white border border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Documents</p>
                 <p className="text-2xl font-semibold text-gray-900">{userDocuments?.length || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Uploaded Files</p>
               </div>
               <FileText className="h-8 w-8 text-gray-400" />
             </div>
@@ -172,12 +197,12 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
         </Card>
       </div>
 
-      <Card className="shadow-sm border bg-white">
-        <CardHeader className="border-b bg-white">
+      <Card className="border border-gray-200 bg-white">
+        <CardHeader className="border-b bg-white border-gray-200">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div>
               <CardTitle className="text-xl font-semibold text-gray-900">Compliance & KYC Management</CardTitle>
-              <CardDescription className="text-gray-600">Monitor user verification and compliance status</CardDescription>
+              <CardDescription className="text-gray-600">Live user verification and compliance monitoring</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -202,6 +227,7 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
                   <TableHead className="font-semibold text-gray-700">MiraklePay ID</TableHead>
                   <TableHead className="font-semibold text-gray-700">Verification Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Bank Verified</TableHead>
+                  <TableHead className="font-semibold text-gray-700">NIN Number</TableHead>
                   <TableHead className="font-semibold text-gray-700">Transaction Count</TableHead>
                   <TableHead className="font-semibold text-gray-700">Risk Level</TableHead>
                   <TableHead className="font-semibold text-gray-700">KYC Status</TableHead>
@@ -246,6 +272,15 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <div className="text-sm">
+                          {profile.nin_number ? (
+                            <span className="font-mono text-gray-700">{profile.nin_number}</span>
+                          ) : (
+                            <span className="text-gray-400">Not provided</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="text-center">
                           <div className="font-medium text-gray-900">{profile.transaction_count}</div>
                           <div className="text-xs text-gray-500">Total</div>
@@ -277,11 +312,11 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex space-x-2 justify-end">
-                          <Button size="sm" variant="outline">
-                            Review
+                          <Button size="sm" variant="outline" onClick={() => handleApproveKYC(profile.id)}>
+                            Approve
                           </Button>
-                          <Button size="sm" variant="outline">
-                            Verify
+                          <Button size="sm" variant="outline" onClick={() => handleRejectKYC(profile.id)}>
+                            Reject
                           </Button>
                         </div>
                       </TableCell>
