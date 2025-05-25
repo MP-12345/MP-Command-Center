@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Shield, AlertTriangle, CheckCircle, FileText, Users } from 'lucide-react';
+import { Search, Shield, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface ComplianceKYCPanelProps {
   department: string;
@@ -26,20 +26,18 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
           full_name,
           phone_number,
           mirackle_id,
+          username,
+          waitlist_email,
           transaction_count,
           is_bank_verified,
           nin_number,
           is_verified,
-          created_at,
-          bvn,
-          waitlist_email,
-          preferred_currency,
-          username
+          created_at
         `)
         .order('created_at', { ascending: false });
 
       if (searchTerm) {
-        query = query.or(`full_name.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%,nin_number.ilike.%${searchTerm}%`);
+        query = query.or(`full_name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%,mirackle_id.ilike.%${searchTerm}%`);
       }
 
       const { data, error } = await query.limit(100);
@@ -61,68 +59,41 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
     }
   });
 
-  const { data: userDocuments, isLoading: documentsLoading, refetch: refetchDocuments } = useQuery({
-    queryKey: ['user-documents'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_documents')
-        .select('*')
-        .order('uploaded_at', { ascending: false });
-
-      if (error) throw error;
-      return data;
-    }
-  });
-
   // Real-time updates every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       refetchProfiles();
       refetchKyc();
-      refetchDocuments();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [refetchProfiles, refetchKyc, refetchDocuments]);
+  }, [refetchProfiles, refetchKyc]);
 
-  const getKYCStatus = (userId: string) => {
-    const kyc = kycVerifications?.find(k => k.user_id === userId);
-    return kyc?.status || 'pending';
+  const getVerificationStatus = (profile: any) => {
+    if (profile.is_verified && profile.is_bank_verified) return 'verified';
+    if (profile.nin_number) return 'pending';
+    return 'unverified';
   };
 
-  const getRiskLevel = (profile: any) => {
-    let score = 0;
-    if (!profile.is_verified) score += 30;
-    if (!profile.is_bank_verified) score += 20;
-    if (!profile.nin_number) score += 25;
-    if (profile.transaction_count > 100) score += 15;
-    if (profile.transaction_count > 500) score += 10;
-
-    if (score >= 70) return 'High';
-    if (score >= 40) return 'Medium';
-    return 'Low';
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'verified':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'unverified':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
   };
 
-  const getUserDocuments = (userId: string) => {
-    return userDocuments?.filter(doc => doc.user_id === userId).length || 0;
-  };
-
-  const handleApproveKYC = async (userId: string) => {
-    console.log('Approving KYC for user:', userId);
-    // Implementation for approving KYC
-  };
-
-  const handleRejectKYC = async (userId: string) => {
-    console.log('Rejecting KYC for user:', userId);
-    // Implementation for rejecting KYC
-  };
-
-  if (profilesLoading || kycLoading || documentsLoading) {
+  if (profilesLoading || kycLoading) {
     return (
-      <div className="space-y-4 p-6">
-        <Card className="border-gray-200 bg-white">
+      <div className="p-6">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-gray-900">Loading Compliance Data...</CardTitle>
+            <CardTitle>Loading Compliance Data...</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -137,187 +108,183 @@ export const ComplianceKYCPanel: React.FC<ComplianceKYCPanelProps> = ({ departme
   }
 
   return (
-    <div className="space-y-4 p-6">
-      {/* Live Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-4">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg p-6 border">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">Compliance & KYC Management</h1>
+            <p className="text-gray-600">Customer verification and compliance monitoring</p>
+          </div>
+          <div className="flex space-x-3">
+            <Button variant="outline">
+              <Shield className="w-4 h-4 mr-2" />
+              Bulk Verify
+            </Button>
+            <Button variant="outline">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Compliance Report
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-semibold text-gray-900">{profiles?.length || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">Live Count</p>
+                <p className="text-sm font-medium text-gray-600">Total Customers</p>
+                <p className="text-3xl font-semibold text-gray-900">{profiles?.length || 0}</p>
               </div>
-              <Users className="h-8 w-8 text-gray-400" />
+              <Shield className="h-8 w-8 text-gray-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-4">
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">KYC Pending</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {kycVerifications?.filter(k => k.status === 'pending').length || 0}
+                <p className="text-sm font-medium text-gray-600">Verified Users</p>
+                <p className="text-3xl font-semibold text-green-600">
+                  {profiles?.filter(p => p.is_verified).length || 0}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Awaiting Review</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-gray-400" />
+              <CheckCircle className="h-8 w-8 text-green-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-4">
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">KYC Approved</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {kycVerifications?.filter(k => k.status === 'approved').length || 0}
+                <p className="text-sm font-medium text-gray-600">Pending Verification</p>
+                <p className="text-3xl font-semibold text-yellow-600">
+                  {profiles?.filter(p => !p.is_verified && p.nin_number).length || 0}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Verified Users</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-gray-400" />
+              <Clock className="h-8 w-8 text-yellow-400" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-4">
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Documents</p>
-                <p className="text-2xl font-semibold text-gray-900">{userDocuments?.length || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">Uploaded Files</p>
+                <p className="text-sm font-medium text-gray-600">Unverified</p>
+                <p className="text-3xl font-semibold text-red-600">
+                  {profiles?.filter(p => !p.is_verified && !p.nin_number).length || 0}
+                </p>
               </div>
-              <FileText className="h-8 w-8 text-gray-400" />
+              <XCircle className="h-8 w-8 text-red-400" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border border-gray-200 bg-white">
-        <CardHeader className="border-b bg-white border-gray-200">
+      {/* Customer Verification */}
+      <Card>
+        <CardHeader>
           <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900">Compliance & KYC Management</CardTitle>
-              <CardDescription className="text-gray-600">Live user verification and compliance monitoring</CardDescription>
+              <CardTitle>Customer Verification Status</CardTitle>
+              <CardDescription>Monitor and manage customer KYC verification status</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent>
           <div className="mb-6">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <Input
-                placeholder="Search by name, MiraklePay ID, or NIN..."
+                placeholder="Search customers by name, phone, or MiraklePay ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-300 focus:border-gray-500"
+                className="pl-10"
               />
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold text-gray-700">User</TableHead>
-                  <TableHead className="font-semibold text-gray-700">MiraklePay ID</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Verification Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Bank Verified</TableHead>
-                  <TableHead className="font-semibold text-gray-700">NIN Number</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Transaction Count</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Risk Level</TableHead>
-                  <TableHead className="font-semibold text-gray-700">KYC Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Documents</TableHead>
-                  <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>MiraklePay ID</TableHead>
+                  <TableHead>Transaction Count</TableHead>
+                  <TableHead>Bank Verified</TableHead>
+                  <TableHead>NIN Provided</TableHead>
+                  <TableHead>Verification Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {profiles?.map((profile) => {
-                  const riskLevel = getRiskLevel(profile);
-                  const kycStatus = getKYCStatus(profile.id);
-                  const documentsCount = getUserDocuments(profile.id);
+                  const verificationStatus = getVerificationStatus(profile);
                   
                   return (
                     <TableRow key={profile.id} className="hover:bg-gray-50">
                       <TableCell>
-                        <div className="min-w-0">
-                          <div className="font-medium text-gray-900 truncate">{profile.full_name || 'Unknown'}</div>
-                          <div className="text-sm text-gray-500 truncate">{profile.phone_number}</div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-600">
+                              {profile.full_name?.charAt(0) || 'U'}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{profile.full_name || 'Unknown'}</div>
+                            <div className="text-sm text-gray-500">{profile.username}</div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-700">
+                        <div className="space-y-1">
+                          <div className="text-sm text-gray-600">{profile.phone_number || 'N/A'}</div>
+                          {profile.waitlist_email && (
+                            <div className="text-sm text-gray-600">{profile.waitlist_email}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded">
                           {profile.mirackle_id}
                         </code>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          {profile.is_verified ? (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                          )}
-                          <Badge variant={profile.is_verified ? "default" : "secondary"}>
-                            {profile.is_verified ? 'Verified' : 'Unverified'}
-                          </Badge>
-                        </div>
+                        <div className="font-medium text-gray-900">{profile.transaction_count || 0}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={profile.is_bank_verified ? "default" : "outline"}>
-                          {profile.is_bank_verified ? 'Yes' : 'No'}
+                        <Badge variant={profile.is_bank_verified ? "default" : "secondary"}>
+                          {profile.is_bank_verified ? 'Verified' : 'Not Verified'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          {profile.nin_number ? (
-                            <span className="font-mono text-gray-700">{profile.nin_number}</span>
-                          ) : (
-                            <span className="text-gray-400">Not provided</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          <div className="font-medium text-gray-900">{profile.transaction_count}</div>
-                          <div className="text-xs text-gray-500">Total</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={
-                            riskLevel === 'High' ? 'destructive' : 
-                            riskLevel === 'Medium' ? 'secondary' : 'default'
-                          }
-                        >
-                          {riskLevel}
+                        <Badge variant={profile.nin_number ? "default" : "secondary"}>
+                          {profile.nin_number ? 'Provided' : 'Not Provided'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Shield className="w-4 h-4 text-blue-600" />
-                          <Badge variant={kycStatus === 'approved' ? 'default' : 'secondary'}>
-                            {kycStatus.toUpperCase()}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          <div className="font-medium text-gray-900">{documentsCount}</div>
-                          <div className="text-xs text-gray-500">Files</div>
-                        </div>
+                        <Badge variant={getStatusBadgeVariant(verificationStatus)}>
+                          {verificationStatus.charAt(0).toUpperCase() + verificationStatus.slice(1)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex space-x-2 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => handleApproveKYC(profile.id)}>
-                            Approve
+                          <Button size="sm" variant="outline">
+                            <Eye className="w-4 h-4 mr-1" />
+                            Review
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleRejectKYC(profile.id)}>
-                            Reject
-                          </Button>
+                          {!profile.is_verified && (
+                            <Button size="sm" variant="outline">
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Verify
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
