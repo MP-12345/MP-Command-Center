@@ -39,8 +39,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         { id: 'users', label: 'Customer Management', icon: Users }
       ],
       compliance: [
-        { id: 'kyc', label: 'KYC Verification', icon: Shield },
-        { id: 'users', label: 'Compliance Review', icon: Users }
+        { id: 'kyc', label: 'KYC Verification', icon: Shield }
       ],
       finance: [
         { id: 'finance', label: 'Treasury Management', icon: DollarSign },
@@ -51,20 +50,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         { id: 'transactions', label: 'Fraud Monitoring', icon: CreditCard }
       ],
       operations: [
-        { id: 'users', label: 'Operations Management', icon: Users },
         { id: 'transactions', label: 'Transaction Operations', icon: CreditCard }
       ],
       marketing: [
-        { id: 'marketing', label: 'Campaign Management', icon: Megaphone },
-        { id: 'users', label: 'User Analytics', icon: Users }
+        { id: 'marketing', label: 'Campaign Management', icon: Megaphone }
       ],
       technical: [
-        { id: 'technical', label: 'System Support', icon: Settings },
-        { id: 'users', label: 'Technical Settings', icon: Users }
+        { id: 'technical', label: 'System Support', icon: Settings }
       ],
       audit: [
-        { id: 'audit', label: 'Audit & Monitoring', icon: FileText },
-        { id: 'users', label: 'Admin Management', icon: Users }
+        { id: 'audit', label: 'Audit & Monitoring', icon: FileText }
       ]
     };
 
