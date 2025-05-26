@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react"
-import { AdminLogin } from "./AdminLogin"
-import { AdminSidebar } from "./AdminSidebar"
+import { AdminLogin } from "@/components/admin/AdminLogin"
+import { AdminSidebar } from "@/components/admin/AdminSidebar"
 import { AdminHeader } from "./AdminHeader"
 import { DashboardOverview } from "./DashboardOverview"
 import { UserManagement } from "./UserManagement"
