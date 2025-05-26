@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LogOut, User, Bell, Settings, ChevronDown } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 
 interface AdminUser {
   id: string
@@ -45,21 +44,18 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ adminUser, onLogout })
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
       <div className="flex h-16 items-center justify-between px-4 md:px-6">
         <div className="flex items-center space-x-4">
-          <SidebarTrigger className="md:hidden" />
           <div className="hidden md:block">
-            <h1 className="text-xl font-semibold text-gray-900">MiraklePay Admin</h1>
+            <h1 className="text-xl font-semibold text-gray-900">MiraklePay Admin Panel</h1>
             <p className="text-sm text-gray-600">Real-time administration dashboard</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          <Button variant="outline" size="sm">
+            <Bell className="w-4 h-4 mr-2" />
+            Notifications
           </Button>
 
-          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-3 h-auto p-2">

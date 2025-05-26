@@ -1,121 +1,209 @@
 
-import { useState, useEffect } from "react"
-import { AdminLogin } from "@/components/admin/AdminLogin"
-import { AdminSidebar } from "@/components/admin/AdminSidebar"
-import { AdminHeader } from "@/components/admin/AdminHeader"
-import { DashboardOverview } from "@/components/admin/DashboardOverview"
-import { UserManagement } from "@/components/admin/UserManagement"
-import { TransactionMonitoring } from "@/components/admin/TransactionMonitoring"
-import { KYCManagement } from "@/components/admin/KYCManagement"
-import { FinanceManagement } from "@/components/admin/FinanceManagement"
-import { RiskManagement } from "@/components/admin/RiskManagement"
-import { MarketingManagement } from "@/components/admin/MarketingManagement"
-import { TechnicalSupport } from "@/components/admin/TechnicalSupport"
-import { AuditLogs } from "@/components/admin/AuditLogs"
-import { EnhancedCustomerSupportPanel } from "@/components/admin/EnhancedCustomerSupportPanel"
-import { useToast } from "@/hooks/use-toast"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import type React from "react"
+import { AdminStats } from "./AdminStats"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Activity,
+  TrendingUp,
+  Users,
+  CreditCard,
+  Shield,
+  DollarSign,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react"
 
-interface AdminUser {
-  id: string
-  email: string
-  full_name: string
+interface DashboardOverviewProps {
   department: string
-  session_token: string
 }
 
-const AdminDashboard = () => {
-  const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
-  const [activeSection, setActiveSection] = useState("overview")
-  const { toast } = useToast()
-
-  // Check for existing session on load
-  useEffect(() => {
-    const savedSession = localStorage.getItem("admin_session")
-    if (savedSession) {
-      try {
-        const session = JSON.parse(savedSession)
-        setAdminUser(session)
-      } catch (error) {
-        localStorage.removeItem("admin_session")
-      }
+export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ department }) => {
+  const getDepartmentQuickActions = () => {
+    const actions: Record<string, Array<{ icon: any; label: string; description: string; color: string }>> = {
+      customer_support: [
+        {
+          icon: Users,
+          label: "Handle Support Tickets",
+          description: "Manage customer inquiries",
+          color: "bg-blue-50 text-blue-700 border-blue-200",
+        },
+        {
+          icon: CreditCard,
+          label: "Transaction Support",
+          description: "Assist with payment issues",
+          color: "bg-green-50 text-green-700 border-green-200",
+        },
+        {
+          icon: Shield,
+          label: "Account Verification",
+          description: "Process KYC requests",
+          color: "bg-purple-50 text-purple-700 border-purple-200",
+        },
+      ],
+      compliance: [
+        {
+          icon: Shield,
+          label: "Review KYC Documents",
+          description: "Verify customer identities",
+          color: "bg-green-50 text-green-700 border-green-200",
+        },
+        {
+          icon: AlertTriangle,
+          label: "Risk Assessment",
+          description: "Evaluate compliance risks",
+          color: "bg-orange-50 text-orange-700 border-orange-200",
+        },
+        {
+          icon: CheckCircle,
+          label: "Compliance Reports",
+          description: "Generate regulatory reports",
+          color: "bg-blue-50 text-blue-700 border-blue-200",
+        },
+      ],
+      finance: [
+        {
+          icon: DollarSign,
+          label: "Treasury Management",
+          description: "Monitor platform liquidity",
+          color: "bg-green-50 text-green-700 border-green-200",
+        },
+        {
+          icon: TrendingUp,
+          label: "Financial Reports",
+          description: "Analyze revenue metrics",
+          color: "bg-blue-50 text-blue-700 border-blue-200",
+        },
+        {
+          icon: CreditCard,
+          label: "Settlement Operations",
+          description: "Process daily settlements",
+          color: "bg-purple-50 text-purple-700 border-purple-200",
+        },
+      ],
+      risk: [
+        {
+          icon: AlertTriangle,
+          label: "Risk Assessment",
+          description: "Monitor high-risk activities",
+          color: "bg-red-50 text-red-700 border-red-200",
+        },
+        {
+          icon: Shield,
+          label: "Fraud Detection",
+          description: "Investigate suspicious transactions",
+          color: "bg-orange-50 text-orange-700 border-orange-200",
+        },
+        {
+          icon: Activity,
+          label: "Real-time Monitoring",
+          description: "Track system anomalies",
+          color: "bg-blue-50 text-blue-700 border-blue-200",
+        },
+      ],
     }
-  }, [])
 
-  const handleLogin = (user: AdminUser) => {
-    setAdminUser(user)
-    localStorage.setItem("admin_session", JSON.stringify(user))
-    toast({
-      title: "Login Successful",
-      description: `Welcome back, ${user.full_name}`,
-    })
+    return actions[department] || actions.customer_support
   }
 
-  const handleLogout = () => {
-    setAdminUser(null)
-    localStorage.removeItem("admin_session")
-    setActiveSection("overview")
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out",
-    })
-  }
-
-  const renderContent = () => {
-    if (!adminUser) return null
-
-    switch (activeSection) {
-      case "overview":
-        return <DashboardOverview department={adminUser.department} />
-      case "users":
-        if (adminUser.department === "customer_support") {
-          return <EnhancedCustomerSupportPanel department={adminUser.department} />
-        }
-        return <UserManagement department={adminUser.department} />
-      case "transactions":
-        return <TransactionMonitoring department={adminUser.department} />
-      case "kyc":
-        return <KYCManagement department={adminUser.department} />
-      case "finance":
-        return <FinanceManagement department={adminUser.department} />
-      case "risk":
-        return <RiskManagement department={adminUser.department} />
-      case "marketing":
-        return <MarketingManagement department={adminUser.department} />
-      case "technical":
-        return <TechnicalSupport department={adminUser.department} />
-      case "audit":
-        return <AuditLogs department={adminUser.department} />
-      default:
-        return <DashboardOverview department={adminUser.department} />
-    }
-  }
-
-  if (!adminUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <AdminLogin onLogin={handleLogin} />
-      </div>
-    )
-  }
+  const quickActions = getDepartmentQuickActions()
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen bg-slate-50 flex w-full">
-        <AdminSidebar
-          department={adminUser.department}
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-        />
-        <div className="flex-1 flex flex-col min-w-0">
-          <AdminHeader adminUser={adminUser} onLogout={handleLogout} />
-          <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
-            <div className="max-w-7xl mx-auto">{renderContent()}</div>
-          </main>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Overview</h2>
+          <p className="text-gray-600 capitalize">
+            {department.replace("_", " ")} Department - Real-time Analytics & Insights
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Activity className="w-3 h-3 mr-1" />
+            Live Data
+          </Badge>
+          <Button variant="outline" size="sm">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            View Reports
+          </Button>
         </div>
       </div>
-    </SidebarProvider>
+
+      <AdminStats department={department} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-lg">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 flex items-center space-x-2">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-blue-600" />
+            </div>
+            <span>Quick Actions</span>
+          </h3>
+          <p className="text-gray-600 mb-4">Access frequently used features for your department</p>
+          <div className="space-y-3">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon
+              return (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all duration-200 ${action.color}`}
+                >
+                  <div className="flex items-start space-x-3">
+                    <Icon className="w-5 h-5 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium">{action.label}</h4>
+                      <p className="text-sm opacity-80 mt-1">{action.description}</p>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 opacity-60" />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-lg">
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 flex items-center space-x-2">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+            </div>
+            <span>System Status</span>
+          </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-green-800">All systems operational</span>
+              </div>
+              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                Live
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-green-800">Database connectivity stable</span>
+              </div>
+              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                99.9%
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-blue-800">Real-time updates active</span>
+              </div>
+              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                <Clock className="w-3 h-3 mr-1" />
+                Live
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
-
-export default AdminDashboard
