@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { AdminLogin } from '@/components/admin/AdminLogin';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { DashboardOverview } from '@/components/admin/DashboardOverview';
 import { UserManagement } from '@/components/admin/UserManagement';
@@ -13,7 +12,9 @@ import { MarketingManagement } from '@/components/admin/MarketingManagement';
 import { TechnicalSupport } from '@/components/admin/TechnicalSupport';
 import { AuditLogs } from '@/components/admin/AuditLogs';
 import { EnhancedCustomerSupportPanel } from '@/components/admin/EnhancedCustomerSupportPanel';
+import { ModernAdminSidebar } from '@/components/admin/ModernAdminSidebar';
 import { useToast } from '@/hooks/use-toast';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 interface AdminUser {
   id: string;
@@ -92,29 +93,36 @@ const AdminDashboard = () => {
 
   if (!adminUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-        <AdminLogin onLogin={handleLogin} />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-indigo-600/10" />
+        <div className="relative z-10">
+          <AdminLogin onLogin={handleLogin} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      <AdminSidebar 
-        department={adminUser.department}
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader 
-          adminUser={adminUser}
-          onLogout={handleLogout}
+    <SidebarProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/50 flex w-full">
+        <ModernAdminSidebar 
+          department={adminUser.department}
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
         />
-        <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 to-slate-100">
-          {renderContent()}
-        </main>
+        <div className="flex-1 flex flex-col min-w-0">
+          <AdminHeader 
+            adminUser={adminUser}
+            onLogout={handleLogout}
+          />
+          <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50/50 to-slate-100/50 p-4 md:p-6">
+            <div className="max-w-7xl mx-auto">
+              {renderContent()}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
